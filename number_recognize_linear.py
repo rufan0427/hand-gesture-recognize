@@ -26,15 +26,15 @@ def h5_to_tensor(h5_file_path):
 
 # 加载数据
 print("正在加载H5数据...")
-training_data=h5_to_tensor("archive1/process_training.h5")
+training_data=h5_to_tensor("archive2/processed_images.h5")
 testing_data=h5_to_tensor("archive1/process_testing.h5")
 print("H5数据加载完成。")
 
-img_train = training_data['images'][:]
+'''img_train = training_data['images'][:]'''
 keypoints_train=training_data['keypoints'][:]
 labels_train = training_data['labels'][:]
 
-img_test = testing_data['images'][:]
+'''img_test = testing_data['images'][:]'''
 keypoints_test=testing_data['keypoints'][:]
 labels_test = testing_data['labels'][:]
 
@@ -44,9 +44,10 @@ print(f"检测到的手势类别数量: {num_classes}")
 
 # 自定义数据集类
 class customDataset(data.Dataset):
-    def __init__(self, images, keypoints, labels, use_keypoints=True, transform=None):
+    #def __init__(self,images, keypoints, labels, use_keypoints=True, transform=None):
+    def __init__(self,keypoints, labels, use_keypoints=True, transform=None):
         super().__init__()
-        self.images = images
+        '''self.images = images'''
         self.keypoints = keypoints
         self.labels = labels
         self.use_keypoints = use_keypoints
@@ -60,13 +61,13 @@ class customDataset(data.Dataset):
         
         if self.use_keypoints:
             data_input = self.keypoints[index]
-        else:
+        '''else:
             img = self.images[index].numpy()
             img = transforms.ToPILImage()(img.transpose(2, 0, 1))
             if self.transform:
                 data_input = self.transform(img)
             else:
-                data_input = transforms.ToTensor()(img)
+                data_input = transforms.ToTensor()(img)'''
 
         return data_input, label
 
@@ -146,7 +147,7 @@ def evaluate_accuracy(net, data_iter, device):
     return metric[0] / metric[1]
 
 # 预测并可视化结果
-def predict_and_visualize(net, test_iter, img_original_test, num_display=5, device="cpu", use_keypoints=True):
+'''def predict_and_visualize(net, test_iter, img_original_test, num_display=5, device="cpu", use_keypoints=True):
     net.to(device)
     net.eval()
     
@@ -156,7 +157,7 @@ def predict_and_visualize(net, test_iter, img_original_test, num_display=5, devi
 
     with torch.no_grad():
         for i, (X, y_true) in enumerate(test_iter):
-            if i<=1:#第三批
+            if i<=2:#第三批
                 continue
             X_device = X.to(device)
             y_true_device = y_true.to(device)
@@ -186,11 +187,11 @@ def predict_and_visualize(net, test_iter, img_original_test, num_display=5, devi
             plt.tight_layout()
             plt.show()
             break # 只展示第一个批次的 num_display 个样本
-
+'''
 
 if __name__ == "__main__":
     batch_size = 32
-    total_epochs = 50
+    total_epochs = 1
     learning_rate = 0.001
 
     # 设备配置
@@ -198,13 +199,18 @@ if __name__ == "__main__":
     print(f"当前使用的设备: {device}")
 
     # 数据集和数据加载器
-    trainData = customDataset(img_train, keypoints_train, labels_train, use_keypoints=True)
+    #trainData = customDataset(img_train, keypoints_train, labels_train, use_keypoints=True)
+    trainData = customDataset(keypoints_train, labels_train, use_keypoints=True)
     train_iter = data.DataLoader(trainData, batch_size=batch_size, shuffle=True, num_workers=0)
     
-    testData = customDataset(img_test, keypoints_test, labels_test, use_keypoints=True)
+    #testData = customDataset(img_test, keypoints_test, labels_test, use_keypoints=True)
+    testData = customDataset(keypoints_test, labels_test, use_keypoints=True)
     test_iter = data.DataLoader(testData, batch_size=batch_size, shuffle=False, num_workers=0)
 
-    net = KeypointGestureRecognizer(num_classes)
+    net = KeypointGestureRecognizer(6)
+    net.load_state_dict(torch.load("keypoint_gesture_recognizer.pth", map_location="cpu"))  
+    net.eval()
+    net.to(torch.device("cpu"))  
     
     error = nn.CrossEntropyLoss(reduction="none")
     optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
@@ -212,5 +218,7 @@ if __name__ == "__main__":
     print("\n开始训练模型...")
     train(net, train_iter, test_iter, error, total_epochs, optimizer, device)
 
-    print("\n正在进行预测和可视化...")
-    predict_and_visualize(net, test_iter, img_test, num_display=5, device=device, use_keypoints=True)
+    torch.save(net.state_dict(), 'keypoint_gesture_recognizer.pth')
+
+    #print("\n正在进行预测和可视化...")
+    #predict_and_visualize(net, test_iter, img_test, num_display=5, device=device, use_keypoints=True)
