@@ -12,8 +12,8 @@ hands = mp_hands.Hands(static_image_mode=True, max_num_hands=1)
 def process_h5(input_path, output_path):
     # 读取原始数据
     with h5py.File(input_path, 'r') as f_in:
-        images = f_in['train_set_x'][:]#对于test数据要换成test_set
-        labels = f_in['train_set_y'][:]
+        images = f_in['test_set_x'][:]#test数据要换成test_set,train->train_set
+        labels = f_in['test_set_y'][:]
     
     # 创建新HDF5文件
     with h5py.File(output_path, 'w') as f_out:
@@ -45,9 +45,9 @@ def process_h5(input_path, output_path):
             
             # MediaPipe处理
             results = hands.process(img_resized)
-            if results.multi_hand_landmarks:
+            if results.multi_hand_world_landmarks:
                 # 获取关键点
-                hand_landmarks = results.multi_hand_landmarks[0]
+                hand_landmarks = results.multi_hand_world_landmarks[0]
                 kps = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark])
                 labelfind = labels[i]
 
@@ -64,5 +64,5 @@ def process_h5(input_path, output_path):
                 print(f"No hand detected in image {i}, skipping...")
 
 if __name__ == "__main__":
-    process_h5('archive1/Signs_Data_Training.h5', 'archive1/process_training.h5')
+    process_h5('archive1/Signs_Data_Testing.h5', 'archive1/process_testing.h5')
     # 检查第10个样本的处理结果

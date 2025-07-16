@@ -63,7 +63,7 @@ def draw_landmarks_on_image(rgb_image, detection_result):
             mp.solutions.drawing_styles.get_default_hand_connections_style())
 
         # 文字位置
-        '''height, width, _ = annotated_image.shape
+        height, width, _ = annotated_image.shape
         x_coordinates = [landmark.x for landmark in hand_landmarks]
         y_coordinates = [landmark.y for landmark in hand_landmarks]
         text_x = int(min(x_coordinates) * width)
@@ -71,9 +71,11 @@ def draw_landmarks_on_image(rgb_image, detection_result):
 
         cv2.putText(annotated_image, f"{handedness[0].category_name}",
                     (text_x, text_y), cv2.FONT_HERSHEY_DUPLEX,
-                    FONT_SIZE, HANDEDNESS_TEXT_COLOR, FONT_THICKNESS, cv2.LINE_AA)'''
-        if current_prediction_label is not None:
-            cv2.putText(annotated_image, f"Gesture: {current_prediction_label}",
+                    FONT_SIZE, HANDEDNESS_TEXT_COLOR, FONT_THICKNESS, cv2.LINE_AA)
+        
+    global current_prediction_label
+    if current_prediction_label is not None:
+            cv2.putText(annotated_image, current_prediction_label,
                         (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 0, 0), 2)
 
     return annotated_image
@@ -86,25 +88,42 @@ current_prediction_label = None
 def result_callback(result, output_image: mp.Image, timestamp_ms: int):
     global last_result, last_image,is_processing
 
-    if result is not None and len(result.hand_landmarks) > 0:
-        hand_landmarks = result.hand_landmarks[0]  # 只处理一只手
+    if result is not None and len(result.hand_world_landmarks) > 0:
+        hand_landmarks = result.hand_world_landmarks[0]  
         keypoints = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks], dtype=np.float32)
         keypoints_tensor = torch.from_numpy(keypoints).view(1, 21, 3).to(torch.device("cpu")) 
+
+        hand_landmarks2= result.hand_world_landmarks[1] if len(result.hand_world_landmarks) > 1 else None 
+        if hand_landmarks2 is not None:
+            keypoints2 = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks2], dtype=np.float32)
+            keypoints_tensor2 = torch.from_numpy(keypoints2).view(1, 21, 3).to(torch.device("cpu")) 
+            #keypoints_tensor = torch.cat((keypoints_tensor, keypoints_tensor2), dim=0)
 
         with torch.no_grad():
             prediction = net(keypoints_tensor)
             predicted_label = prediction.argmax(dim=1).item()
+            if hand_landmarks2 is not None:
+                prediction2 = net(keypoints_tensor2)
+                predicted_label2 = prediction2.argmax(dim=1).item()
             #print(f"识别结果：{predicted_label}") 
 
-        global current_prediction_label
-        current_prediction_label = predicted_label
+        global current_prediction_label,current_prediction_label2
+        if hand_landmarks2 is not None:
+            current_prediction_label2 = predicted_label2
+            if result.handedness[0][0].category_name == "Left":
+                current_prediction_label = f"result:  right:{predicted_label} , left:{predicted_label2}"
+            else:
+                current_prediction_label = f"result:  left:{predicted_label} , right:{predicted_label2}"
+            current_prediction_label = f"result:  right:{predicted_label} , left:{predicted_label2}"
+        else:
+            current_prediction_label = f"result: {predicted_label}"
 
     last_result = result
     last_image = output_image.numpy_view()
     is_processing = False 
 
 # 初始化 HandLandmarker
-base_options = python.BaseOptions(model_asset_path=r'D:\Desktop\contest\hand_landmarker.task')
+base_options = python.BaseOptions(model_asset_path=r'D:\\Desktop\\contest\\hand_landmarker.task')
 options = vision.HandLandmarkerOptions(
     base_options=base_options,
     running_mode=vision.RunningMode.LIVE_STREAM,
