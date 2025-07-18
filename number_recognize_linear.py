@@ -26,8 +26,8 @@ def h5_to_tensor(h5_file_path):
 
 # 加载数据
 print("正在加载H5数据...")
-training_data=h5_to_tensor("archive1/process_training.h5")
-testing_data=h5_to_tensor("archive1/process_testing.h5")
+training_data=h5_to_tensor("archive1/hand_landmarks_dataset1.h5")
+testing_data=h5_to_tensor("archive1/hand_landmarks_dataset_test1.h5")
 print("H5数据加载完成。")
 
 '''img_train = training_data['images'][:]'''
@@ -191,7 +191,7 @@ def evaluate_accuracy(net, data_iter, device):
 
 if __name__ == "__main__":
     batch_size = 32
-    total_epochs =50
+    total_epochs =25
     learning_rate = 0.001
 
     # 设备配置
@@ -207,10 +207,10 @@ if __name__ == "__main__":
     testData = customDataset(keypoints_test, labels_test, use_keypoints=True)
     test_iter = data.DataLoader(testData, batch_size=batch_size, shuffle=False, num_workers=0)
 
-    net = KeypointGestureRecognizer(6)
-    #net.load_state_dict(torch.load("keypoint_gesture_recognizer.pth", map_location="cpu"))  
-    #net.eval()
-    #net.to(torch.device("cpu"))  
+    net = KeypointGestureRecognizer(10)
+    net.load_state_dict(torch.load("keypoint_gesture_recognizer.pth", map_location="cpu"))  
+    net.eval()
+    net.to(torch.device("cpu"))  
     
     error = nn.CrossEntropyLoss(reduction="none")
     optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)

@@ -36,8 +36,8 @@ def process_images_to_h5(image_dir, output_h5_path):
             
             # 提取关键点
             results = hands.process(img_rgb)
-            if results.multi_hand_landmarks:
-                hand_landmarks = results.multi_hand_landmarks[0]
+            if results.multi_hand_world_landmarks:
+                hand_landmarks = results.multi_hand_world_landmarks[0]
                 kps = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark])
                 handedness = 0 if results.multi_handedness[0].classification[0].label == 'Left' else 1
     
@@ -56,3 +56,5 @@ if __name__ == "__main__":
     image_dir = "archive2/Finger_Dataset/five"  # 存放 1.jpg, 2.jpg...的文件夹
     output_h5_path = "archive2/processed_images.h5"
     process_images_to_h5(image_dir, output_h5_path)
+
+#新的数据集来自：https://github.com/daocunyang/Chinese-Number-Gestures-Recognition 和 https://github.com/nadalii/Chinese-Number-Gesture-Recognition-Static-

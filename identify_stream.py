@@ -80,6 +80,18 @@ def draw_landmarks_on_image(rgb_image, detection_result):
 
     return annotated_image
 
+'''kalman_filters = [cv2.KalmanFilter(6, 3) for _ in range(21)]  # 6状态（位置+速度），3观测（x,y,z）
+
+def smooth_with_kalman(landmarks):
+    smoothed = []
+    for i, (x, y, z) in enumerate(landmarks):
+        kf = kalman_filters[i]
+        measurement = np.array([[x], [y], [z]], dtype=np.float32)
+        kf.correct(measurement)
+        prediction = kf.predict()
+        smoothed.append([prediction[0][0], prediction[1][0], prediction[2][0]])
+    return smoothed
+'''
 # 结果回调
 last_image=None
 last_result=None
@@ -91,11 +103,13 @@ def result_callback(result, output_image: mp.Image, timestamp_ms: int):
     if result is not None and len(result.hand_world_landmarks) > 0:
         hand_landmarks = result.hand_world_landmarks[0]  
         keypoints = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks], dtype=np.float32)
+        #keypoints =smooth_with_kalman(keypoints)
         keypoints_tensor = torch.from_numpy(keypoints).view(1, 21, 3).to(torch.device("cpu")) 
 
         hand_landmarks2= result.hand_world_landmarks[1] if len(result.hand_world_landmarks) > 1 else None 
         if hand_landmarks2 is not None:
             keypoints2 = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks2], dtype=np.float32)
+            #keypoints2 = smooth_with_kalman(keypoints2)
             keypoints_tensor2 = torch.from_numpy(keypoints2).view(1, 21, 3).to(torch.device("cpu")) 
             #keypoints_tensor = torch.cat((keypoints_tensor, keypoints_tensor2), dim=0)
 
@@ -132,13 +146,16 @@ options = vision.HandLandmarkerOptions(
 
 detector = vision.HandLandmarker.create_from_options(options)
 
-net = KeypointGestureRecognizer(6)
+net = KeypointGestureRecognizer(10)
 net.load_state_dict(torch.load("keypoint_gesture_recognizer.pth", map_location="cpu"))  
 net.eval()
 net.to(torch.device("cpu"))  
 
 # 摄像头输入
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+cap.set(cv2.CAP_PROP_FPS, 30)
 if not cap.isOpened():
     print("Error: Could not open camera.")
     exit()
