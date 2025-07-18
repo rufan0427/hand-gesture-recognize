@@ -16,7 +16,7 @@ def h5_to_tensor(h5_file_path):
         keys=list(h5.keys())
         for key in keys:
             data = h5[key][:]
-            if key == 'labels':
+            if key == 'labels' or key == 'handedness':
                 # Labels should be of type Long (int64) for CrossEntropyLoss
                 h5_tensor[key]=torch.from_numpy(data).long() # Modified: .long() for labels
             else:
@@ -32,10 +32,12 @@ print("H5数据加载完成。")
 
 '''img_train = training_data['images'][:]'''
 keypoints_train=training_data['keypoints'][:]
+angles_train = training_data['angles'][:]
 labels_train = training_data['labels'][:]
 
 '''img_test = testing_data['images'][:]'''
 keypoints_test=testing_data['keypoints'][:]
+angles_test = testing_data['angles'][:]
 labels_test = testing_data['labels'][:]
 
 # 动态获取类别数量
@@ -45,10 +47,11 @@ print(f"检测到的手势类别数量: {num_classes}")
 # 自定义数据集类
 class customDataset(data.Dataset):
     #def __init__(self,images, keypoints, labels, use_keypoints=True, transform=None):
-    def __init__(self,keypoints, labels, use_keypoints=True, transform=None):
+    def __init__(self,keypoints, labels, angles, use_keypoints=True, transform=None):
         super().__init__()
         '''self.images = images'''
         self.keypoints = keypoints
+        self.angles = angles
         self.labels = labels
         self.use_keypoints = use_keypoints
         self.transform = transform
@@ -60,7 +63,10 @@ class customDataset(data.Dataset):
         label = self.labels[index]
         
         if self.use_keypoints:
-            data_input = self.keypoints[index]
+            input_data = []
+            input_data.append(self.keypoints[index].flatten())
+            input_data.append(self.angles[index])
+            data_input = torch.cat(input_data, dim=0)
         '''else:
             img = self.images[index].numpy()
             img = transforms.ToPILImage()(img.transpose(2, 0, 1))
@@ -75,9 +81,8 @@ class customDataset(data.Dataset):
 class KeypointGestureRecognizer(nn.Module):
     def __init__(self, num_classes):
         super(KeypointGestureRecognizer, self).__init__()
-        self.flatten = nn.Flatten()
         self.fc_layers = nn.Sequential(
-            nn.Linear(21 * 3, 128),
+            nn.Linear(21*3+15, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -85,7 +90,6 @@ class KeypointGestureRecognizer(nn.Module):
         )
 
     def forward(self, x):
-        x = self.flatten(x)
         x = self.fc_layers(x)
         return x
 
@@ -191,7 +195,7 @@ def evaluate_accuracy(net, data_iter, device):
 
 if __name__ == "__main__":
     batch_size = 32
-    total_epochs =25
+    total_epochs =20
     learning_rate = 0.001
 
     # 设备配置
@@ -200,17 +204,17 @@ if __name__ == "__main__":
 
     # 数据集和数据加载器
     #trainData = customDataset(img_train, keypoints_train, labels_train, use_keypoints=True)
-    trainData = customDataset(keypoints_train, labels_train, use_keypoints=True)
+    trainData = customDataset(keypoints_train, labels_train,angles_train, use_keypoints=True)
     train_iter = data.DataLoader(trainData, batch_size=batch_size, shuffle=True, num_workers=0)
     
     #testData = customDataset(img_test, keypoints_test, labels_test, use_keypoints=True)
-    testData = customDataset(keypoints_test, labels_test, use_keypoints=True)
+    testData = customDataset(keypoints_test, labels_test,angles_test, use_keypoints=True)
     test_iter = data.DataLoader(testData, batch_size=batch_size, shuffle=False, num_workers=0)
 
     net = KeypointGestureRecognizer(10)
-    net.load_state_dict(torch.load("keypoint_gesture_recognizer.pth", map_location="cpu"))  
-    net.eval()
-    net.to(torch.device("cpu"))  
+    #net.load_state_dict(torch.load("keypoint_gesture_recognizer.pth", map_location="cpu"))  
+    #net.eval()
+    #net.to(torch.device("cpu"))  
     
     error = nn.CrossEntropyLoss(reduction="none")
     optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
