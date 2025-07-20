@@ -71,8 +71,8 @@ def get_finger_angles(keypoints):
     # 无名指: 13(掌骨), 14(MCP), 15(PIP), 16(DIP/尖)
     # 小指: 17(掌骨), 18(MCP), 19(PIP), 20(DIP/尖)
     
-    finger_metacarpal_bases = [5, 9, 13, 17] # 掌骨基部 (靠近手腕)
-    finger_mcp_joints = [6, 10, 14, 18] # 掌指关节
+    finger_metacarpal_bases = [5, 9, 13, 17] #掌骨基部 (靠近手腕)
+    finger_mcp_joints = [6, 10, 14, 18] #掌指关节
     finger_pip_joints = [7, 11, 15, 19] # 近端指间关节
     finger_tip_joints = [8, 12, 16, 20] # 远端指间关节/指尖
 

@@ -1,6 +1,6 @@
 import h5py
 
-with h5py.File('./archive1/process_training.h5', 'r') as f:
+with h5py.File('./archive1/hand_landmarks_dataset_train2.h5', 'r') as f:
     print("Keys in the HDF5 file:", list(f.keys()))
     print("Dataset structure:")
     for key in f.keys():

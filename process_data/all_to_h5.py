@@ -132,10 +132,20 @@ def flip_keypoints_y(keypoints):
     flipped_keypoints[:, 1] = -flipped_keypoints[:, 1]  # 翻转X坐标
     return flipped_keypoints
 
+def flip_keypoints_z(keypoints):
+    """
+    对关键点进行y轴镜像翻转。
+    keypoints: numpy array of shape (21, 3)
+    """
+    flipped_keypoints = keypoints.copy()
+    flipped_keypoints[:, 2] = -flipped_keypoints[:, 2]  # 翻转X坐标
+    return flipped_keypoints
+
+
 def process_dataset_to_h5(dataset_dir, output_h5_path):
     # 获取所有类别文件夹
-    class_dirs = sorted([d for d in os.listdir(dataset_dir) 
-                        if os.path.isdir(os.path.join(dataset_dir, d))])
+    #class_dirs = sorted([d for d in os.listdir(dataset_dir) 
+    #                    if os.path.isdir(os.path.join(dataset_dir, d))])
     
     # 创建 HDF5 文件
     with h5py.File(output_h5_path, 'w') as f_out:
@@ -148,96 +158,113 @@ def process_dataset_to_h5(dataset_dir, output_h5_path):
                            maxshape=(None,), dtype='int8')
         f_out.create_dataset('angles',shape=(0,15),maxshape=(None,15),dtype='float32')
         # 处理每个类别文件夹
-        for class_dir in tqdm(class_dirs, desc="Processing Classes"):
-            class_path = os.path.join(dataset_dir, class_dir)
-            label = int(class_dir)  # 文件夹名就是标签
-
-            rotation_angles = [0, 5, 355 , 10 , 350 , 90, 180, 270] # 原始、旋转90、180、270度
-            apply_flip = True # 是否应用镜像对称
-
-            # 获取类别文件夹中的所有图片
-            image_files = [f for f in os.listdir(class_path) 
-                          if f.endswith(('.jpg', '.png', '.jpeg'))]
+        #for class_dir in tqdm(class_dirs, desc="Processing Classes"):
+            #class_path = os.path.join(dataset_dir, class_dir)
+            #Wlabel = int(class_dir)  # 文件夹名就是标签
             
-            # 处理每张图片
-            for img_file in tqdm(image_files, desc=f"Processing Class {label}", leave=False):
-                img_path = os.path.join(class_path, img_file)
-                img = cv2.imread(img_path)
-                if img is None:
-                    print(f"无法读取图片: {img_path}")
-                    continue
-                    
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                
-                # 提取关键点
-                results = hands.process(img_rgb)
-                if results.multi_hand_world_landmarks:
-                    hand_landmarks = results.multi_hand_world_landmarks[0]
-                    kps = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark])
-                    angles=get_finger_angles(kps)
+        class_path  = dataset_dir
+        rotation_angles = [0, 5,355, 10,350] # 原始、旋转90、180、270度
+        apply_flip = True # 是否应用镜像对称
 
-                    # 确定手性 (0=左手, 1=右手)
-                    handedness = 0 if results.multi_handedness[0].classification[0].label == 'Left' else 1
+        # 获取类别文件夹中的所有图片
+        image_files = [f for f in os.listdir(class_path) 
+                      if f.endswith(('.jpg', '.png', '.jpeg'))]
+            
+        # 处理每张图片
+        for i,img_file in zip(range(10),tqdm(image_files, desc=f"Processing Class 8", leave=False)):
+
+            img_path = os.path.join(class_path, img_file)
+            img = cv2.imread(img_path)
+            if img is None:
+                print(f"无法读取图片: {img_path}")
+                continue
                     
-                    # 扩展数据集
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+            # 提取关键点
+            results = hands.process(img_rgb)
+            if results.multi_hand_world_landmarks:
+                hand_landmarks = results.multi_hand_world_landmarks[0]
+                kps = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark])
+                angles=get_finger_angles(kps)
+                label = 8
+                # 确定手性 (0=左手, 1=右手)
+                handedness = 0 if results.multi_handedness[0].classification[0].label == 'Left' else 1
+            
+                # 扩展数据集
+                f_out['keypoints'].resize((f_out['keypoints'].shape[0] + 1, 21, 3))
+                f_out['keypoints'][-1] = kps
+                    
+                f_out['labels'].resize((f_out['labels'].shape[0] + 1,))
+                f_out['labels'][-1] = label
+                    
+                f_out['handedness'].resize((f_out['handedness'].shape[0] + 1,))
+                f_out['handedness'][-1] = handedness
+
+                f_out['angles'].resize((f_out['angles'].shape[0] + 1, angles.shape[0])) # 调整形状
+                f_out['angles'][-1] = angles
+                for angle in rotation_angles:
+                    rotated_kps = rotate_keypoints(kps, angle)
+                    rotated_angles=get_finger_angles(rotated_kps)
+
+                    # 保存原始旋转数据
                     f_out['keypoints'].resize((f_out['keypoints'].shape[0] + 1, 21, 3))
-                    f_out['keypoints'][-1] = kps
-                    
+                    f_out['keypoints'][-1] = rotated_kps
+                        
                     f_out['labels'].resize((f_out['labels'].shape[0] + 1,))
                     f_out['labels'][-1] = label
-                    
+                        
                     f_out['handedness'].resize((f_out['handedness'].shape[0] + 1,))
                     f_out['handedness'][-1] = handedness
 
-                    f_out['angles'].resize((f_out['angles'].shape[0] + 1, angles.shape[0])) # 调整形状
-                    f_out['angles'][-1] = angles
-                    for angle in rotation_angles:
-                        rotated_kps = rotate_keypoints(kps, angle)
-                        rotated_angles=get_finger_angles(rotated_kps)
-
-                        # 保存原始旋转数据
+                    f_out['angles'].resize((f_out['angles'].shape[0] + 1, rotated_angles.shape[0])) 
+                    f_out['angles'][-1] = rotated_angles
+                    # 如果启用镜像，则对旋转后的数据进行镜像
+                    if apply_flip:
+                        flipped_rotated_kps = flip_keypoints_x(rotated_kps)
+                        flipped_handedness = 1 - handedness # 翻转手性
+                            
                         f_out['keypoints'].resize((f_out['keypoints'].shape[0] + 1, 21, 3))
-                        f_out['keypoints'][-1] = rotated_kps
-                        
+                        f_out['keypoints'][-1] = flipped_rotated_kps
+                            
                         f_out['labels'].resize((f_out['labels'].shape[0] + 1,))
                         f_out['labels'][-1] = label
-                        
+                            
                         f_out['handedness'].resize((f_out['handedness'].shape[0] + 1,))
-                        f_out['handedness'][-1] = handedness
+                        f_out['handedness'][-1] = flipped_handedness
 
                         f_out['angles'].resize((f_out['angles'].shape[0] + 1, rotated_angles.shape[0])) 
                         f_out['angles'][-1] = rotated_angles
-                        # 如果启用镜像，则对旋转后的数据进行镜像
-                        if apply_flip:
-                            flipped_rotated_kps = flip_keypoints_x(rotated_kps)
-                            flipped_handedness = 1 - handedness # 翻转手性
-                            
-                            f_out['keypoints'].resize((f_out['keypoints'].shape[0] + 1, 21, 3))
-                            f_out['keypoints'][-1] = flipped_rotated_kps
-                            
-                            f_out['labels'].resize((f_out['labels'].shape[0] + 1,))
-                            f_out['labels'][-1] = label
-                            
-                            f_out['handedness'].resize((f_out['handedness'].shape[0] + 1,))
-                            f_out['handedness'][-1] = flipped_handedness
 
-                            f_out['angles'].resize((f_out['angles'].shape[0] + 1, rotated_angles.shape[0])) 
-                            f_out['angles'][-1] = rotated_angles
+                        flipped_rotated_kps = flip_keypoints_y(rotated_kps)
+                        flipped_handedness = 1 - handedness # 翻转手性
+                            
+                        f_out['keypoints'].resize((f_out['keypoints'].shape[0] + 1, 21, 3))
+                        f_out['keypoints'][-1] = flipped_rotated_kps
+                            
+                        f_out['labels'].resize((f_out['labels'].shape[0] + 1,))
+                        f_out['labels'][-1] = label
+                            
+                        f_out['handedness'].resize((f_out['handedness'].shape[0] + 1,))
+                        f_out['handedness'][-1] = flipped_handedness
 
-                            flipped_rotated_kps = flip_keypoints_y(rotated_kps)
-                            flipped_handedness = 1 - handedness # 翻转手性
-                            
-                            f_out['keypoints'].resize((f_out['keypoints'].shape[0] + 1, 21, 3))
-                            f_out['keypoints'][-1] = flipped_rotated_kps
-                            
-                            f_out['labels'].resize((f_out['labels'].shape[0] + 1,))
-                            f_out['labels'][-1] = label
-                            
-                            f_out['handedness'].resize((f_out['handedness'].shape[0] + 1,))
-                            f_out['handedness'][-1] = flipped_handedness
+                        f_out['angles'].resize((f_out['angles'].shape[0] + 1, rotated_angles.shape[0])) 
+                        f_out['angles'][-1] = rotated_angles
 
-                            f_out['angles'].resize((f_out['angles'].shape[0] + 1, rotated_angles.shape[0])) 
-                            f_out['angles'][-1] = rotated_angles
+                        flipped_rotated_kps = flip_keypoints_z(rotated_kps)
+                        flipped_handedness = 1 - handedness # 翻转手性
+                            
+                        f_out['keypoints'].resize((f_out['keypoints'].shape[0] + 1, 21, 3))
+                        f_out['keypoints'][-1] = flipped_rotated_kps
+                            
+                        f_out['labels'].resize((f_out['labels'].shape[0] + 1,))
+                        f_out['labels'][-1] = label
+                            
+                        f_out['handedness'].resize((f_out['handedness'].shape[0] + 1,))
+                        f_out['handedness'][-1] = flipped_handedness
+
+                        f_out['angles'].resize((f_out['angles'].shape[0] + 1, rotated_angles.shape[0])) 
+                        f_out['angles'][-1] = rotated_angles
                 else:
                     print(f"未检测到手部: {img_path}")
             #cv2.imshow("photo",img_rgb)
@@ -245,6 +272,6 @@ def process_dataset_to_h5(dataset_dir, output_h5_path):
             #cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    dataset_dir = "dataset1/Chinese-Number-Gestures-Recognition-main/data/RGB/test"  # 包含0-9文件夹的根目录
-    output_h5_path = "archive1/hand_landmarks_dataset_test1.h5"
+    dataset_dir = "dataset1/Chinese-Number-Gestures-Recognition-main/data/RGB/test/8"  # 包含0-9文件夹的根目录
+    output_h5_path = "archive1/hand_landmarks_dataset_train2.h5"
     process_dataset_to_h5(dataset_dir, output_h5_path)
