@@ -26,7 +26,7 @@ def h5_to_tensor(h5_file_path):
 
 # 加载数据
 print("正在加载H5数据...")
-training_data=h5_to_tensor("archive1/hand_landmarks_dataset_train1.h5")
+training_data=h5_to_tensor("archive1/hand_landmarks_dataset_train2.h5")
 testing_data=h5_to_tensor("archive1/hand_landmarks_dataset_test1.h5")
 print("H5数据加载完成。")
 
@@ -195,8 +195,8 @@ def evaluate_accuracy(net, data_iter, device):
 
 if __name__ == "__main__":
     batch_size = 32
-    total_epochs =10
-    learning_rate = 0.0001
+    total_epochs =1
+    learning_rate = 0.00001
 
     # 设备配置
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

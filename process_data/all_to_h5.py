@@ -187,7 +187,7 @@ def process_dataset_to_h5(dataset_dir, output_h5_path):
                 hand_landmarks = results.multi_hand_world_landmarks[0]
                 kps = np.array([[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark])
                 angles=get_finger_angles(kps)
-                label = 8
+                label = 5
                 # 确定手性 (0=左手, 1=右手)
                 handedness = 0 if results.multi_handedness[0].classification[0].label == 'Left' else 1
             
@@ -272,6 +272,6 @@ def process_dataset_to_h5(dataset_dir, output_h5_path):
             #cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    dataset_dir = "dataset1/Chinese-Number-Gestures-Recognition-main/data/RGB/test/8"  # 包含0-9文件夹的根目录
+    dataset_dir = "dataset1/Chinese-Number-Gestures-Recognition-main/data/RGB/test/5"  # 包含0-9文件夹的根目录
     output_h5_path = "archive1/hand_landmarks_dataset_train2.h5"
     process_dataset_to_h5(dataset_dir, output_h5_path)
